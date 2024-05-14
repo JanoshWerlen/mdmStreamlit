@@ -1,52 +1,36 @@
 import streamlit as st
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import pandas as pd
+import seaborn as sns
 
-# streamlit cache clear (or menu)
-@st.cache_resource
+# Laden des Titanic-Datensets
+@st.cache
 def load_data():
-    tokenizer = AutoTokenizer.from_pretrained("microsoft/DialoGPT-medium")
-    model = AutoModelForCausalLM.from_pretrained("microsoft/DialoGPT-medium")
-    return tokenizer, model
+    df = sns.load_dataset('titanic')
+    return df
 
-st.set_page_config(page_title="Chatbot")
-st.write("Welcome to the DialoGPT-medium chatbot example.")
-tokenizer, model = load_data()
+df = load_data()
 
-# Init Session State
-if 'step' not in st.session_state:
-    st.session_state.step = 0
-    st.session_state.chat_history_ids = None
-    st.session_state.history = []
-else:
-    st.session_state.step+=1
+# Streamlit-Seitenkonfiguration
+st.set_page_config(page_title="Titanic Dataset Explorer")
+st.title("Titanic Dataset Explorer")
 
-input = st.text_input(label="Enter your question:")
+# Eingabefelder zur Datenfilterung
+class_filter = st.sidebar.multiselect('Wähle die Klassen:', options=df['class'].unique(), default=df['class'].unique())
+sex_filter = st.sidebar.multiselect('Wähle das Geschlecht:', options=df['sex'].unique(), default=df['sex'].unique())
+survived_filter = st.sidebar.radio('Überlebensstatus:', ['All', 'Survived', 'Not Survived'])
 
-if input:
-    # encode the new user input, add the eos_token and return a tensor in Pytorch
-    new_user_input_ids = tokenizer.encode(input + tokenizer.eos_token, return_tensors='pt')
+# Filteranwendung basierend auf der Auswahl
+filtered_data = df[(df['class'].isin(class_filter)) & (df['sex'].isin(sex_filter))]
+if survived_filter == 'Survived':
+    filtered_data = filtered_data[filtered_data['survived'] == 1]
+elif survived_filter == 'Not Survived':
+    filtered_data = filtered_data[filtered_data['survived'] == 0]
 
-    # append the new user input tokens to the chat history
-    bot_input_ids = torch.cat([st.session_state.chat_history_ids, new_user_input_ids], dim=-1) if st.session_state.step > 1 else new_user_input_ids
+# Datenanzeige
+st.write("Anzahl der angezeigten Einträge:", filtered_data.shape[0])
+st.dataframe(filtered_data)
 
-    # generated a response while limiting the total chat history to 1000 tokens, 
-    st.session_state.chat_history_ids = model.generate(bot_input_ids, max_length=1000, pad_token_id=tokenizer.eos_token_id)
-
-    # pretty print last ouput tokens from bot
-    response = tokenizer.decode(st.session_state.chat_history_ids[:, bot_input_ids.shape[-1]:][0], skip_special_tokens=True)
-    st.session_state.history.append(input)
-    st.session_state.history.append(response)
-
-if st.button('Reset'):
-    st.session_state.step = 0
-    st.session_state.chat_history_ids = None
-    st.session_state.history = []
-
-for x in range(len(st.session_state.history)):
-    person = "**User**" if x%2==0 else "**Bot**"
-    st.write(person, st.session_state.history[x])
-    
-st.write("Step: ", st.session_state.step)
-st.write(st.session_state.chat_history_ids)
-
+# Visualisierungen
+st.write("Verteilung der Überlebenden nach Klasse und Geschlecht")
+fig = sns.catplot(data=filtered_data, kind='count', x='class', hue='sex', col='survived', palette='viridis', aspect=.7)
+st.pyplot(fig)

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import seaborn as sns
+#
 
 # Ensure this is the first command executed:
 st.set_page_config(page_title="Titanic Dataset Explorer", layout='wide')
@@ -13,7 +14,7 @@ def load_data():
 
 df = load_data()
 
-st.title("Titanic Dataset Explorer")
+st.title("Titanic Dataset Explorers")
 
 # Ensuring the column exists and using correct data type
 if 'class' in df.columns:
